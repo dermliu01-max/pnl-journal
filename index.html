@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>損益日誌 · 雲端同步版 v3.0</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #0D1117; --panel: #161B22; --panel2: #1C232C;
+      --border: #2A323D; --text: #E6EBF2; --muted: #7E8A9A;
+      --gain: #FF5D5D; --loss: #21C77A; --accent: #E3B23C;
+      --accent-dim: rgba(227,178,60,0.14);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: 'Inter', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif;
+    }
+    .app { min-height: 100vh; padding: 18px 16px 40px; max-width: 760px; margin: 0 auto; }
+    
+    .bignum { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 38px; font-weight: 700; letter-spacing: -1px; margin-top: 4px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+    .statnum { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 700; font-size: 19px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+    @media (max-width: 430px) { .bignum { font-size: 32px; } }
+    
+    header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .brand { font-size: 22px; font-weight: 800; letter-spacing: 0.5px; }
+    .brand span { color: var(--accent); }
+    .legend { display: flex; gap: 12px; font-size: 12px; margin-top: 4px; }
+    
+    .hero { margin-top: 16px; background: linear-gradient(160deg, var(--panel) 0%, var(--panel2) 100%); border: 1px solid var(--border); border-radius: 16px; padding: 20px 22px; position: relative; overflow: hidden; }
+    .hero-label { color: var(--muted); font-size: 13px; letter-spacing: 1px; }
+    .hero-sub { color: var(--muted); font-size: 13px; margin-top: 6px; }
+    .dot { margin: 0 8px; color: var(--border); }
+    
+    .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+    .card-label { color: var(--muted); font-size: 12px; }
+    .card-sub { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    
+    .tabs { display: flex; gap: 6px; margin-top: 18px; border-bottom: 1px solid var(--border); }
+    .tab { background: transparent; border: none; color: var(--muted); padding: 10px 12px; font-size: 14px; cursor: pointer; border-bottom: 2px solid transparent; }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--text); border-bottom: 2px solid var(--accent); font-weight: 600; }
+    
+    .section { margin-top: 16px; }
+    .row-between { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px; }
+    .section-title { font-size: 14px; font-weight: 600; color: var(--text); }
+    
+    button { font-family: inherit; }
+    .btn-primary { background: var(--accent); color: #1a1407; border: none; border-radius: 9px; padding: 8px 14px; font-weight: 700; font-size: 13px; cursor: pointer; transition: 0.2s; }
+    .btn-primary:active { transform: translateY(1px); }
+    .btn-ghost { background: transparent; color: var(--accent); border: 1px solid var(--border); border-radius: 9px; padding: 8px 12px; font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.2s; }
+    .btn-ghost:active { transform: translateY(1px); }
+    .link { background: none; border: none; color: var(--muted); font-size: 12px; cursor: pointer; margin-top: 6px; }
+    .link:hover { text-decoration: underline; }
+    
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; margin-bottom: 10px; }
+    .chip { background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 16px; padding: 4px 12px; font-size: 12px; cursor: pointer; }
+    .chip.active { background: var(--accent-dim); color: var(--accent); border: 1px solid var(--accent); }
+    .chip:active { transform: translateY(1px); }
+    
+    .form-box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 12px; }
+    .field-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .field { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }
+    .field.grow { flex: 2; }
+    .field label { color: var(--muted); font-size: 12px; }
+    .input { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 9px 10px; font-size: 14px; width: 100%; outline: none; }
+    .input:focus { border-color: var(--accent) !important; }
+    select { appearance: none; -webkit-appearance: none; }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.5; }
+    
+    .pos-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; gap: 12px; align-items: flex-start; margin-bottom: 10px; transition: 0.2s; }
+    .pos-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .tag { font-size: 11px; color: var(--accent); border: 1px solid var(--accent); border-radius: 5px; padding: 1px 6px; }
+    .tag.loss { color: var(--loss); border-color: var(--loss); }
+    .tag.muted { color: var(--muted); border-color: var(--border); }
+    .pos-name { font-weight: 600; color: var(--text); }
+    .pos-meta { color: var(--muted); font-size: 12px; margin-top: 5px; }
+    .price-edit { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    .price-input { background: var(--bg); border: 1px solid var(--accent); border-radius: 7px; color: var(--text); padding: 5px 8px; font-size: 14px; width: 110px; outline: none; font-variant-numeric: tabular-nums; }
+    
+    .date-head { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 2px; border-bottom: 1px solid var(--border); font-weight: 600; margin-top: 14px; }
+    .trade-row { display: flex; align-items: center; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--border); }
+    
+    .empty { background: var(--panel); border: 1px dashed var(--border); border-radius: 12px; padding: 22px 18px; text-align: center; margin-top: 8px; }
+    .empty-title { color: var(--text); font-weight: 600; margin-bottom: 6px; }
+    .empty-body { color: var(--muted); font-size: 13px; line-height: 1.6; }
+    
+    .footer-actions { display: flex; flex-direction: column; margin-top: 28px; padding-top: 16px; border-top: 1px dashed var(--border); font-size: 12px; color: var(--muted); gap: 12px; }
+    .action-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .action-group { display: flex; flex-wrap: wrap; gap: 12px; }
+    
+    .color-gain { color: var(--gain); }
+    .color-loss { color: var(--loss); }
+    .color-muted { color: var(--muted); }
+    .color-accent { color: var(--accent); }
+    .d-none { display: none; }
+  </style>
+</head>
+<body>
+  <div class="app" id="appRoot">
+    <div style="text-align: center; color: var(--muted); margin-top: 40px;">系統載入中...</div>
+  </div>
+
+  <input type="file" id="fileUpload" class="d-none" accept=".json, .csv" onchange="window.handleFileUpload(event)">
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+    import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+    /* ───────────── Firebase 初始化 ───────────── */
+    const firebaseConfig = {
+      apiKey: "AIzaSyDzUisXaOvJX-T62pSGKzDzFq8GJUkCn4M",
+      authDomain: "pnl-journal-17044.firebaseapp.com",
+      databaseURL: "https://pnl-journal-17044-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "pnl-journal-17044",
+      storageBucket: "pnl-journal-17044.firebasestorage.app",
+      messagingSenderId: "100224129454",
+      appId: "1:100224129454:web:00f0cc65e669ea2de8d03f"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+    const provider = new GoogleAuthProvider();
+
+    /* ───────────── 核心常數與輔助函式 ───────────── */
+    const STORAGE_KEY = "pnl-journal-v2";
+    const CATS = ["基金", "ETF", "股票", "股期"];
+    const TRADE_CATS = ["股票", "股期"];
+    const CURRENCIES = ["TWD", "USD", "EUR", "JPY", "HKD", "CNY", "GBP", "AUD"];
+    const C = { gain: "#FF5D5D", loss: "#21C77A", muted: "#7E8A9A", accent: "#E3B23C", border: "#2A323D" };
+
+    const todayStr = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+    const monthStr = () => todayStr().slice(0, 7);
+    const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
+    const fmtAmt = (n) => { if (!isFinite(n)) n = 0; const r = Math.round(n); return (r > 0 ? "+" : r < 0 ? "-" : "") + "NT$" + Math.abs(r).toLocaleString("en-US"); };
+    const fmtPrice = (n) => (isFinite(n) ? n : 0).toLocaleString("en-US", { maximumFractionDigits: 4 });
+    const colorClass = (n) => (n > 0 ? "color-gain" : n < 0 ? "color-loss" : "color-muted");
+
+    const qtyLabel = (c) => (c === "基金" ? "單位數" : c === "股期" ? "口數" : "股數");
+    const costLabel = (c) => (c === "基金" ? "成本淨值" : c === "股期" ? "進場價" : "平均成本");
+    const priceLabel = (c) => (c === "基金" ? "目前淨值" : "現價");
+    const hasDir = (c) => c !== "基金";
+    const hasMult = (c) => c === "股期";
+    const fxOf = (p) => (p.ccy && p.ccy !== "TWD" ? num(p.fx) || 1 : 1);
+    const unrealOf = (p) => { const mult = hasMult(p.cat) ? num(p.mult) || 1 : 1; const sign = p.dir === "空" ? -1 : 1; return sign * (num(p.price) - num(p.cost)) * num(p.qty) * mult * fxOf(p); };
+    const costBasisOf = (p) => { const mult = hasMult(p.cat) ? num(p.mult) || 1 : 1; return Math.abs(num(p.cost) * num(p.qty) * mult * fxOf(p)); };
+    const uid = () => Math.random().toString(36).slice(2, 9);
+
+    /* ───────────── 狀態管理 ───────────── */
+    let currentUser = null;
+    let state = {
+      data: { positions: [], trades: [], snapshots: [] },
+      tab: "dash", loaded: false,
+      dashRange: "全部", posOpen: false, posCat: "全部", posDir: "全部", tradeOpen: false, tradeCat: "全部", tradeMonth: "全部",
+      draftPos: { cat: "股票", name: "", dir: "多", qty: "", cost: "", price: "", mult: "2000", ccy: "TWD", fx: "1" },
+      draftTrade: { date: todayStr(), cat: "股票", name: "", grossPnl: "", fee: "0", note: "" },
+      closingPosId: null, draftClose: { qty: "", price: "", fee: "0" }
+    };
+    let chartInstance = null;
+
+    /* ───────────── 認證與資料同步 ───────────── */
+    onAuthStateChanged(auth, async (user) => {
+      currentUser = user;
+      await loadData();
+    });
+
+    window.triggerLogin = () => signInWithPopup(auth, provider).catch(e => console.error("Login Error", e));
+    window.triggerLogout = () => signOut(auth);
+
+    async function loadData() {
+      if (currentUser) {
+        // 從雲端載入
+        try {
+          const snapshot = await get(child(ref(db), `users/${currentUser.uid}/journalData`));
+          if (snapshot.exists()) {
+            state.data = snapshot.val();
+            // 確保陣列存在
+            if (!state.data.positions) state.data.positions = [];
+            if (!state.data.trades) state.data.trades = [];
+            if (!state.data.snapshots) state.data.snapshots = [];
+          } else {
+            // 如果雲端沒資料，嘗試把本機資料搬過去
+            const localSaved = localStorage.getItem(STORAGE_KEY);
+            if (localSaved) {
+              state.data = { ...state.data, ...JSON.parse(localSaved) };
+              await saveData(); // 觸發寫入雲端
+            }
+          }
+        } catch (e) { console.error("Cloud Load Error", e); }
+      } else {
+        // 從本機載入
+        try {
+          const localSaved = localStorage.getItem(STORAGE_KEY);
+          if (localSaved) state.data = { ...state.data, ...JSON.parse(localSaved) };
+        } catch (e) {}
+      }
+      state.loaded = true;
+      autoSnapshot(); render();
+    }
+
+    async function saveData() {
+      if (!state.loaded) return;
+      if (currentUser) {
+        // 寫入雲端
+        try {
+          await set(ref(db, `users/${currentUser.uid}/journalData`), state.data);
+        } catch (e) { console.error("Cloud Save Error", e); }
+      } else {
+        // 寫入本機
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
+      }
+    }
+
+    function getCalculatedPositions() {
+      return state.data.positions.map(p => {
+        const unreal = unrealOf(p);
+        const basis = costBasisOf(p);
+        const ret = basis ? (unreal / basis) * 100 : 0;
+        return { ...p, unreal, basis, ret };
+      });
+    }
+
+    function autoSnapshot() {
+      const posCalc = getCalculatedPositions();
+      const totalUnreal = posCalc.reduce((s, p) => s + p.unreal, 0);
+      const t = todayStr();
+      const rest = state.data.snapshots.filter((s) => s.date !== t);
+      const next = [...rest, { date: t, unrealized: totalUnreal }].sort((a, b) => a.date < b.date ? -1 : 1);
+      const currentToday = state.data.snapshots.find(s => s.date === t);
+      if (!currentToday || currentToday.unrealized !== totalUnreal) {
+          state.data.snapshots = next; saveData();
+      }
+    }
+
+    function getSeries() {
+      const tByDate = {};
+      state.data.trades.forEach(t => { tByDate[t.date] = (tByDate[t.date] || 0) + num(t.pnl); });
+      const sByDate = {};
+      state.data.snapshots.forEach(s => { sByDate[s.date] = s.unrealized; });
+      const dates = Array.from(new Set([...Object.keys(tByDate), ...Object.keys(sByDate)])).sort();
+      let prevU = null, cum = 0;
+      return dates.map(date => {
+        const realized = tByDate[date] || 0;
+        let floatChg = 0;
+        if (date in sByDate) { floatChg = prevU !== null ? sByDate[date] - prevU : 0; prevU = sByDate[date]; }
+        const dayTotal = realized + floatChg;
+        cum += dayTotal;
+        return { date, realized, floatChg, dayTotal, cum };
+      });
+    }
+
+    /* ───────────── UI 渲染 ───────────── */
+    function render() {
+      if (!state.loaded) return;
+      autoSnapshot();
+
+      const posCalc = getCalculatedPositions();
+      const totalUnreal = posCalc.reduce((s, p) => s + p.unreal, 0);
+      const totalRealized = state.data.trades.reduce((s, t) => s + num(t.pnl), 0);
+      const monthRealized = state.data.trades.filter(t => t.date.startsWith(monthStr())).reduce((s, t) => s + num(t.pnl), 0);
+      const todayRealized = state.data.trades.filter(t => t.date === todayStr()).reduce((s, t) => s + num(t.pnl), 0);
+      const series = getSeries();
+      const todayRow = series.find(s => s.date === todayStr());
+      
+      const appHtml = `
+        <header>
+          <div>
+            <div class="brand"><span>損益</span>日誌</div>
+            <div class="legend">
+              <span class="color-gain">● 紅 獲利</span><span class="color-loss">● 綠 虧損</span><span class="color-muted">${todayStr()}</span>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+            ${currentUser ? 
+              `<span style="color:var(--muted); font-size:11px;">🟢 已連線: ${currentUser.email}</span>
+               <button class="btn-ghost" style="padding:4px 10px; font-size:11px; color:var(--muted); border-color:var(--border);" onclick="triggerLogout()">登出</button>` : 
+              `<button class="btn-primary" style="padding:6px 12px; font-size:12px;" onclick="triggerLogin()">☁️ 登入 Google 同步</button>`
+            }
+          </div>
+        </header>
+
+        <section class="hero">
+          <div class="hero-label">今日合計損益</div>
+          <div class="bignum ${colorClass(todayRow?.dayTotal || 0)}">${fmtAmt(todayRow?.dayTotal || 0)}</div>
+          <div class="hero-sub">
+            當沖/實現 <b class="${colorClass(todayRealized)}">${fmtAmt(todayRealized)}</b>
+            <span class="dot">·</span>留倉浮動變化 <b class="${colorClass(todayRow?.floatChg || 0)}">${fmtAmt(todayRow?.floatChg || 0)}</b>
+          </div>
+        </section>
+
+        <section class="cards">
+          ${renderStat("留倉浮動損益", totalUnreal, "目前帳上未實現")}
+          ${renderStat("累計實現損益", totalRealized, "歷史交易總計")}
+          ${renderStat("本月實現損益", monthRealized, monthStr())}
+          ${renderStat("總權益損益", totalRealized + totalUnreal, "實現 + 浮動")}
+        </section>
+
+        <nav class="tabs">
+          <button class="tab ${state.tab === 'dash' ? 'active' : ''}" onclick="setTab('dash')">走勢</button>
+          <button class="tab ${state.tab === 'positions' ? 'active' : ''}" onclick="setTab('positions')">留倉部位 ${state.data.positions.length || ''}</button>
+          <button class="tab ${state.tab === 'trades' ? 'active' : ''}" onclick="setTab('trades')">當沖 / 已實現 ${state.data.trades.length || ''}</button>
+        </nav>
+
+        ${state.tab === 'dash' ? renderDashboard(series) : ''}
+        ${state.tab === 'positions' ? renderPositions(posCalc) : ''}
+        ${state.tab === 'trades' ? renderTrades() : ''}
+
+        <div class="footer-actions">
+          <div class="action-row">
+            <span>${currentUser ? '☁️ 資料已安全同步至雲端' : '⚠ 未登入，資料僅保存在此裝置瀏覽器中'}</span>
+            <button class="link color-accent" onclick="document.getElementById('fileUpload').click()">⇧ 匯入備份檔 (JSON / CSV)</button>
+          </div>
+          <div class="action-row" style="background: var(--panel2); padding: 12px; border-radius: 8px;">
+            <span>📥 匯出工具：</span>
+            <div class="action-group">
+              <button class="link color-muted" onclick="triggerBackup()">JSON (完整還原)</button>
+              <button class="link color-muted" onclick="exportCSV('trade')">CSV (歷史紀錄)</button>
+              <button class="link color-muted" onclick="exportCSV('pos')">CSV (留倉部位)</button>
+            </div>
+          </div>
+          <button class="link color-loss" style="width:100%; text-align:right;" onclick="clearAll()">清除全部資料</button>
+        </div>
+      `;
+
+      document.getElementById('appRoot').innerHTML = appHtml;
+      if (state.tab === 'dash' && series.length > 0) initChart(series);
+    }
+
+    function renderStat(label, value, sub) { return `<div class="card"><div class="card-label">${label}</div><div class="statnum ${colorClass(value)}">${fmtAmt(value)}</div><div class="card-sub">${sub}</div></div>`; }
+    function renderChips(options, currentValue, onChangeStr) { return `<div class="chips">${options.map(o => `<button class="chip ${currentValue === o ? 'active' : ''}" onclick="${onChangeStr}('${o}')">${o}</button>`).join('')}</div>`; }
+
+    /* ───────────── 各區塊視圖 (無更動) ───────────── */
+    function renderDashboard(series) {
+      if (series.length === 0) return `<div class="empty"><div class="empty-title">還沒有任何損益紀錄</div><div class="empty-body">新增交易或留倉部位後，這裡就會畫出走勢。</div></div>`;
+      return `
+        <div class="section">
+          <div class="row-between"><div class="section-title">每日損益與權益走勢</div><button class="btn-ghost" onclick="exportCSV('daily')">↓ 走勢 CSV</button></div>
+          ${renderChips(['全部', '本月', '近30天'], state.dashRange, 'setDashRange')}
+          <div style="width: 100%; height: 280px; margin-top: 8px;"><canvas id="pnlChart"></canvas></div>
+        </div>
+      `;
+    }
+
+    function initChart(fullSeries) {
+      const filtered = fullSeries.filter(s => state.dashRange === '全部' || (state.dashRange === '本月' && s.date.startsWith(monthStr())) || (state.dashRange === '近30天' && (Date.now() - new Date(s.date).getTime()) / 86400000 <= 30));
+      const labels = filtered.map(s => s.date.slice(5));
+      const ctx = document.getElementById('pnlChart');
+      if (!ctx) return;
+      if (chartInstance) chartInstance.destroy();
+      chartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [ { type: 'line', label: '累計權益', data: filtered.map(s => s.cum), borderColor: C.accent, borderWidth: 2, pointRadius: 0, yAxisID: 'y' }, { type: 'bar', label: '當日合計', data: filtered.map(s => s.dayTotal), backgroundColor: filtered.map(s => s.dayTotal >= 0 ? C.gain : C.loss), borderRadius: { topLeft: 3, topRight: 3 }, yAxisID: 'y' } ] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } } } }
+      });
+    }
+
+    function renderPositions(rows) {
+      const shown = rows.filter(r => (state.posCat === "全部" || r.cat === state.posCat) && (state.posDir === "全部" || (hasDir(r.cat) ? r.dir : "多") === state.posDir));
+      let html = `<div class="section"><div class="row-between"><div class="section-title">留倉部位</div><button class="btn-primary" onclick="togglePosForm()">${state.posOpen ? '取消' : '+ 新增部位'}</button></div>`;
+
+      if (state.posOpen) {
+        const d = state.draftPos;
+        html += `
+          <form class="form-box" onsubmit="event.preventDefault(); submitPos();">
+            <div class="field-row"><div class="field"><label>類別</label><select class="input" onchange="updateDraftPos('cat', this.value)">${CATS.map(c => `<option ${d.cat === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div><div class="field grow"><label>名稱 / 代號</label><input class="input" required value="${d.name}" oninput="updateDraftPos('name', this.value)"></div></div>
+            <div class="field-row">${hasDir(d.cat) ? `<div class="field"><label>方向</label><select class="input" onchange="updateDraftPos('dir', this.value)"><option value="多" ${d.dir === '多' ? 'selected' : ''}>多</option><option value="空" ${d.dir === '空' ? 'selected' : ''}>空</option></select></div>` : ''}<div class="field"><label>${qtyLabel(d.cat)}</label><input class="input" required inputmode="decimal" value="${d.qty}" oninput="updateDraftPos('qty', this.value)"></div>${hasMult(d.cat) ? `<div class="field"><label>乘數</label><input class="input" required inputmode="decimal" value="${d.mult}" oninput="updateDraftPos('mult', this.value)"></div>` : ''}</div>
+            <div class="field-row"><div class="field"><label>${costLabel(d.cat)}</label><input class="input" required inputmode="decimal" value="${d.cost}" oninput="updateDraftPos('cost', this.value)"></div><div class="field"><label>${priceLabel(d.cat)}</label><input class="input" required inputmode="decimal" value="${d.price}" oninput="updateDraftPos('price', this.value)"></div></div>
+            <button type="submit" class="btn-primary" style="width:100%; margin-top:8px;">加入部位</button>
+          </form>
+        `;
+      }
+      if (rows.length > 0) {
+        html += renderChips(['全部', ...CATS], state.posCat, 'setPosCat') + `<div style="display:flex; flex-direction:column; gap:10px; margin-top:10px;">`;
+        shown.forEach(p => {
+          if (state.closingPosId === p.id) {
+            html += `<div class="pos-card" style="flex-direction:column; background: var(--panel2); border-color: var(--accent);"><div style="font-weight:600; font-size:14px;">⚡ 平倉賣出：${p.name} (剩餘 ${num(p.qty)})</div><div class="field-row" style="margin-top:8px; width:100%;"><div class="field"><label>數量</label><input class="input" type="number" step="any" value="${state.draftClose.qty}" oninput="updateDraftClose('qty', this.value)"></div><div class="field"><label>成交價</label><input class="input" type="number" step="any" value="${state.draftClose.price}" oninput="updateDraftClose('price', this.value)"></div><div class="field"><label>手續費/稅</label><input class="input" type="number" step="any" value="${state.draftClose.fee}" oninput="updateDraftClose('fee', this.value)"></div></div><div style="display:flex; gap:8px; margin-top:12px;"><button class="btn-primary" onclick="submitClosePos('${p.id}')">確認平倉</button><button class="btn-ghost" onclick="initClosePos(null)">取消</button></div></div>`;
+          } else {
+            html += `<div class="pos-card"><div style="flex:1; min-width:0;"><div class="pos-top"><span class="tag">${p.cat}</span>${hasDir(p.cat) && p.dir === '空' ? `<span class="tag loss">空</span>` : ''}<span class="pos-name">${p.name}</span></div><div class="pos-meta">${qtyLabel(p.cat)} ${fmtPrice(num(p.qty))} ${costLabel(p.cat)} ${fmtPrice(num(p.cost))}</div><div class="price-edit"><span class="color-muted" style="font-size:12px;">現價</span><input class="price-input" inputmode="decimal" value="${p.price}" onchange="updatePosPrice('${p.id}', this.value)"></div></div><div style="text-align:right; white-space:nowrap;"><div class="statnum ${colorClass(p.unreal)}" style="font-size:18px;">${fmtAmt(p.unreal)}</div><div class="${colorClass(p.unreal)}" style="font-size:12px;">${p.ret >= 0 ? '+' : ''}${p.ret.toFixed(2)}%</div><div style="display:flex; justify-content:flex-end; gap:12px; margin-top:6px;"><button class="link color-accent" onclick="initClosePos('${p.id}')">平倉</button><button class="link" onclick="delPos('${p.id}')">刪除</button></div></div></div>`;
+          }
+        });
+        html += `</div>`;
+      }
+      return html + `</div>`;
+    }
+
+    function renderTrades() {
+      const rows = state.data.trades;
+      const shown = rows.filter(t => (state.tradeCat === "全部" || t.cat === state.tradeCat) && (state.tradeMonth === "全部" || t.date.startsWith(state.tradeMonth)));
+      const byDate = {}; shown.forEach(t => (byDate[t.date] = byDate[t.date] || []).push(t));
+
+      let html = `<div class="section"><div class="row-between"><div class="section-title">當沖與已實現紀錄</div><button class="btn-primary" onclick="toggleTradeForm()">${state.tradeOpen ? '取消' : '+ 新增紀錄'}</button></div>`;
+
+      if (state.tradeOpen) {
+        const d = state.draftTrade;
+        html += `
+          <form class="form-box" onsubmit="event.preventDefault(); submitTrade();">
+            <div class="field-row"><div class="field"><label>日期</label><input type="date" required class="input" value="${d.date}" oninput="updateDraftTrade('date', this.value)"></div><div class="field"><label>類別</label><select class="input" onchange="updateDraftTrade('cat', this.value)">${TRADE_CATS.map(c => `<option ${d.cat === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div></div>
+            <div class="field-row"><div class="field grow"><label>名稱 / 代號</label><input class="input" required placeholder="如：2330 台積電" value="${d.name}" oninput="updateDraftTrade('name', this.value)"></div></div>
+            <div class="field-row"><div class="field grow"><label>毛損益 (Gross PnL)</label><input class="input" required inputmode="decimal" placeholder="獲利正、虧損負" value="${d.grossPnl}" oninput="updateDraftTrade('grossPnl', this.value)"></div><div class="field"><label>手續費/交易稅</label><input class="input" required inputmode="decimal" value="${d.fee}" oninput="updateDraftTrade('fee', this.value)"></div></div>
+            <div class="field"><label>備註（可選）</label><input class="input" value="${d.note}" oninput="updateDraftTrade('note', this.value)"></div>
+            <button type="submit" class="btn-primary" style="width:100%; margin-top:8px;">記錄交易</button>
+          </form>
+        `;
+      }
+
+      if (rows.length > 0) {
+        Object.keys(byDate).sort().reverse().forEach(date => {
+          const list = byDate[date]; const sum = list.reduce((s, t) => s + num(t.pnl), 0);
+          html += `<div style="margin-top: 14px;"><div class="date-head"><span class="color-muted">${date}</span><span class="statnum ${colorClass(sum)}">${fmtAmt(sum)}</span></div>`;
+          list.forEach(t => {
+            const feeStr = num(t.fee) > 0 ? ` (已扣費 ${fmtAmt(-num(t.fee))})` : '';
+            html += `<div class="trade-row"><span class="tag">${t.cat}</span><div style="flex:1; min-width:0;"><div style="color:var(--text);">${t.name || '（未命名）'}</div><div class="color-muted" style="font-size:11px;">毛利 ${fmtAmt(t.grossPnl || t.pnl)}${feeStr} ${t.note ? `· ${t.note}` : ''}</div></div><span class="statnum ${colorClass(num(t.pnl))}" style="font-size:15px;">${fmtAmt(num(t.pnl))}</span><button class="link" style="margin-top:0;" onclick="delTrade('${t.id}')">✕</button></div>`;
+          });
+          html += `</div>`;
+        });
+      }
+      return html + `</div>`;
+    }
+
+    /* ───────────── 綁定事件到全域 (為了讓 HTML onClick 抓得到) ───────────── */
+    window.setTab = (t) => { state.tab = t; render(); };
+    window.setDashRange = (v) => { state.dashRange = v; render(); };
+    window.setPosCat = (v) => { state.posCat = v; render(); };
+    window.togglePosForm = () => { state.posOpen = !state.posOpen; render(); };
+    window.updateDraftPos = (k, v) => { state.draftPos[k] = v; if(k==='cat') render(); };
+    window.updatePosPrice = (id, val) => { const p = state.data.positions.find(x => x.id === id); if (p) { p.price = val; saveData(); render(); } };
+    window.delPos = (id) => { state.data.positions = state.data.positions.filter(p => p.id !== id); saveData(); render(); };
+    window.submitPos = () => {
+      const d = state.draftPos; if (!d.name.trim()) return;
+      state.data.positions.push({ id: uid(), cat: d.cat, name: d.name.trim(), dir: hasDir(d.cat) ? d.dir : "多", qty: d.qty, cost: d.cost, price: d.price, mult: hasMult(d.cat) ? d.mult || "2000" : "1", ccy: d.ccy, fx: d.ccy === "TWD" ? "1" : d.fx || "1" });
+      state.draftPos = { cat: "股票", name: "", dir: "多", qty: "", cost: "", price: "", mult: "2000", ccy: "TWD", fx: "1" };
+      state.posOpen = false; saveData(); render();
+    };
+
+    window.initClosePos = (id) => { state.closingPosId = id; if (id) { const p = state.data.positions.find(x => x.id === id); state.draftClose = { qty: p.qty, price: p.price, fee: "0" }; } render(); };
+    window.updateDraftClose = (k, v) => { state.draftClose[k] = v; };
+    window.submitClosePos = (id) => {
+      const p = state.data.positions.find(x => x.id === id);
+      const sellQty = num(state.draftClose.qty); const sellPrice = num(state.draftClose.price); const fee = num(state.draftClose.fee);
+      if (sellQty <= 0 || sellQty > num(p.qty)) return alert("數量無效");
+      const mult = hasMult(p.cat) ? num(p.mult) || 1 : 1; const sign = p.dir === "空" ? -1 : 1;
+      const grossPnl = sign * (sellPrice - num(p.cost)) * sellQty * mult * fxOf(p);
+      state.data.trades.unshift({ id: uid(), date: todayStr(), cat: p.cat, name: p.name, grossPnl: grossPnl, fee: fee, pnl: grossPnl - fee, note: `平倉 ${sellQty} @ ${sellPrice}` });
+      p.qty = num(p.qty) - sellQty; if (p.qty <= 0) state.data.positions = state.data.positions.filter(x => x.id !== id);
+      state.closingPosId = null; saveData(); render();
+    };
+
+    window.toggleTradeForm = () => { state.tradeOpen = !state.tradeOpen; render(); };
+    window.updateDraftTrade = (k, v) => { state.draftTrade[k] = v; };
+    window.delTrade = (id) => { state.data.trades = state.data.trades.filter(t => t.id !== id); saveData(); render(); };
+    window.submitTrade = () => {
+      const d = state.draftTrade; if (d.grossPnl === "") return;
+      const gross = num(d.grossPnl); const fee = num(d.fee);
+      state.data.trades.unshift({ id: uid(), ...d, name: d.name.trim(), grossPnl: gross, fee: fee, pnl: gross - fee });
+      state.draftTrade = { date: d.date, cat: "股票", name: "", grossPnl: "", fee: "0", note: "" };
+      state.tradeOpen = false; saveData(); render();
+    };
+
+    window.clearAll = () => { if (confirm("確定要清除全部資料嗎？")) { state.data = { positions: [], trades: [], snapshots: [] }; saveData(); render(); } };
+    
+    window.triggerBackup = () => {
+      const blob = new Blob([JSON.stringify(state.data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob); const a = document.createElement("a");
+      a.href = url; a.download = `損益備份_${todayStr()}.json`; a.click(); URL.revokeObjectURL(url);
+    };
+
+    window.exportCSV = (type) => {
+      let rows, filename;
+      if (type === 'daily') {
+        const filtered = getSeries().filter(s => state.dashRange === '全部' || (state.dashRange === '本月' && s.date.startsWith(monthStr())) || (state.dashRange === '近30天' && (Date.now() - new Date(s.date).getTime()) / 86400000 <= 30));
+        rows = [["日期", "當沖實現", "留倉浮動變化", "當日合計", "累計權益"], ...filtered.map(s => [s.date, s.realized, s.floatChg, s.dayTotal, s.cum])];
+        filename = "每日走勢.csv";
+      } else if (type === 'pos') {
+        rows = [["類別", "名稱", "方向", "數量", "成本", "現價", "契約乘數", "幣別", "匯率", "浮動損益TWD", "報酬率%"], ...getCalculatedPositions().map(p => [p.cat, p.name, hasDir(p.cat) ? p.dir : "多", p.qty, p.cost, p.price, hasMult(p.cat) ? p.mult : 1, p.ccy || "TWD", fxOf(p), Math.round(p.unreal), p.ret.toFixed(2)])];
+        filename = `留倉部位_${todayStr()}.csv`;
+      } else if (type === 'trade') {
+        rows = [["日期", "類別", "名稱", "毛損益", "手續費/稅", "淨損益", "備註"], ...state.data.trades.map(t => [t.date, t.cat, t.name, num(t.grossPnl || t.pnl), num(t.fee || 0), num(t.pnl), t.note || ""])];
+        filename = `歷史紀錄_${todayStr()}.csv`;
+      }
+      if(rows) {
+        const csv = rows.map(r => r.map(cell => { const s = String(cell == null ? "" : cell); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(",")).join("\n");
+        const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob); const a = document.createElement("a");
+        a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url);
+      }
+    };
+
+    window.handleFileUpload = (event) => {
+      const file = event.target.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target.result;
+        if (file.name.endsWith('.json')) {
+          try {
+            const parsed = JSON.parse(content);
+            if (parsed.positions && parsed.trades) { state.data = parsed; saveData(); render(); alert("✅ 資料還原成功！(已同步至雲端)"); }
+          } catch (err) { alert("❌ 檔案解析失敗"); }
+        } else if (file.name.endsWith('.csv')) {
+          const lines = content.split('\n').filter(l => l.trim() !== ''); let count = 0;
+          for(let i = 1; i < lines.length; i++) {
+            const cols = lines[i].split(',').map(s => s.replace(/(^"|"$)/g, '').trim());
+            if (cols.length >= 4) {
+              const gross = num(cols[3]); const fee = num(cols[4] || 0); const net = cols[5] ? num(cols[5]) : (gross - fee);
+              state.data.trades.push({ id: uid(), date: cols[0] || todayStr(), cat: cols[1] || '股票', name: cols[2] || '匯入部位', grossPnl: gross, fee: fee, pnl: net, note: cols[6] || '' }); count++;
+            }
+          }
+          saveData(); render(); alert(`✅ 成功從 CSV 匯入了 ${count} 筆交易紀錄！`);
+        }
+      };
+      reader.readAsText(file); event.target.value = '';
+    };
+
+    // 啟動時先跑一次空的 render 讓畫面出現骨架
+    document.addEventListener("DOMContentLoaded", () => {
+      // 不直接跑 loadData，等待 onAuthStateChanged 觸發
+    });
+  </script>
+</body>
+</html>
